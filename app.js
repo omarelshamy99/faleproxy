@@ -29,51 +29,50 @@ app.post('/fetch', async (req, res) => {
     const response = await axios.get(url);
     const html = response.data;
 
-    // Use cheerio to parse HTML and selectively replace text content, not URLs
-    const $ = cheerio.load(html);
-    
-    // Function to replace text but skip URLs and attributes
-    function replaceYaleWithFale(i, el) {
-      if ($(el).children().length === 0 || $(el).text().trim() !== '') {
-        // Get the HTML content of the element
-        let content = $(el).html();
-        
-        // Only process if it's a text node
-        if (content && $(el).children().length === 0) {
-          // Replace Yale with Fale in text content only
-          content = content.replace(/Yale/g, 'Fale').replace(/yale/g, 'fale').replace(/YALE/g, 'FALE');
-          $(el).html(content);
-        }
-      }
-    }
+    // Load HTML with original whitespace
+    const $ = cheerio.load(html, {
+      decodeEntities: false,
+      normalizeWhitespace: false,
+      xmlMode: false
+    });
     
     // Process text nodes in the body
     $('body *').contents().filter(function() {
       return this.nodeType === 3; // Text nodes only
     }).each(function() {
-      // Replace text content but not in URLs or attributes
       const text = $(this).text();
-      const newText = text.replace(/Yale/g, 'Fale').replace(/yale/g, 'fale').replace(/YALE/g, 'FALE');
-      if (text !== newText) {
+      // Only replace if text contains Yale (case insensitive)
+      if (text.match(/yale/i)) {
+        const newText = text.replace(/YALE/g, 'FALE')  // Replace uppercase first
+                           .replace(/Yale/g, 'Fale')    // Then title case
+                           .replace(/yale/g, 'fale');   // Then lowercase
         $(this).replaceWith(newText);
       }
     });
     
     // Process title separately
-    const title = $('title').text().replace(/Yale/g, 'Fale').replace(/yale/g, 'fale').replace(/YALE/g, 'FALE');
-    $('title').text(title);
+    const titleText = $('title').text();
+    if (titleText.match(/yale/i)) {
+      const newTitle = titleText.replace(/YALE/g, 'FALE')
+                               .replace(/Yale/g, 'Fale')
+                               .replace(/yale/g, 'fale');
+      $('title').text(newTitle);
+    }
     
-    return res.json({ 
-      success: true, 
-      content: $.html(),
-      title: title,
+    // Return the modified content with success flag and title
+    return res.json({
+      success: true,
+      content: $.html({ decodeEntities: false }),
+      title: $('title').text(),
       originalUrl: url
     });
   } catch (error) {
+    // Enhanced error handling to ensure consistent error format
     console.error('Error fetching URL:', error.message);
-    return res.status(500).json({ 
-      error: `Failed to fetch content: ${error.message}` 
-    });
+    const errorMessage = error.response 
+      ? `Failed to fetch content: HTTP ${error.response.status}`
+      : 'Failed to fetch content';
+    return res.status(500).json({ error: errorMessage });
   }
 });
 
