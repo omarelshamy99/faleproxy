@@ -6,7 +6,7 @@ const express = require('express');
 const path = require('path');
 
 // Set a different port for testing to avoid conflict with the main app
-const TEST_PORT = 3099;
+const TEST_PORT = 3098;
 let server;
 
 describe('Integration Tests', () => {
@@ -145,10 +145,13 @@ describe('Integration Tests', () => {
   }, 10000);
 
   test('Should handle missing URL parameter', async () => {
-    const response = await axios.post(`http://localhost:${TEST_PORT}/fetch`, {})
-      .catch(error => error.response);
-    
-    expect(response.status).toBe(400);
-    expect(response.data.error).toBe('URL is required');
+    try {
+      await axios.post(`http://localhost:${TEST_PORT}/fetch`, {});
+      // If we reach here, the request didn't fail as expected
+      throw new Error('Expected request to fail');
+    } catch (error) {
+      expect(error.response.status).toBe(400);
+      expect(error.response.data.error).toBe('URL is required');
+    }
   }, 10000);
 });
